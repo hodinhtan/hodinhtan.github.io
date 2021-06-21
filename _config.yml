@@ -1,1 +1,13 @@
 theme: jekyll-theme-minimal
+jekyll_admin:
+  hidden_links:
+    - posts
+    - pages
+    - staticfiles
+    - datafiles
+    - configuration
+  homepage: "pages"
+collections:
+  posts:
+    output: true
+    sidebar_label: News
