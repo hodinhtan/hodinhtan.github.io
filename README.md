@@ -1,2 +1,3 @@
-# ioblog
-blog
+# Blog
+
+Jekyll theme
