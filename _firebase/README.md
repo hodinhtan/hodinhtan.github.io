@@ -21,7 +21,18 @@ Mã nguồn trang là công khai, nhưng dữ liệu nằm trên Firestore và �
 1. **Project settings** (bánh răng) → **Your apps** → biểu tượng **Web `</>`** → đặt tên → **Register app**.
 2. Chép các giá trị `apiKey`, `authDomain`, `projectId`, `appId` vào `private/firebase-config.js`, commit lên nhánh `gh-pages`.
 
-## 5. Sử dụng
+## 5. Giới hạn apiKey (khuyến nghị)
+Chỉ cho phép key dùng trên trang của bạn, tránh người khác dùng ké hạn mức miễn phí.
+1. Vào https://console.cloud.google.com/apis/credentials?project=hodinhtangithubio
+2. Bấm vào key **Browser key (auto created by Firebase)** (key trùng với `apiKey` trong `firebase-config.js`).
+3. **Application restrictions** → chọn **Websites** → **Add** lần lượt:
+   - `https://hodinhtan.github.io/*`
+   - `https://hodinhtangithubio.firebaseapp.com/*` (bắt buộc — cửa sổ đăng nhập Google chạy trên tên miền này)
+4. **API restrictions** để nguyên **Don't restrict key** → **Save**. Thay đổi có hiệu lực sau vài phút.
+
+Nếu sau đó đăng nhập báo lỗi `auth/requests-from-referer-...-are-blocked`, kiểm tra lại 2 dòng ở bước 3.
+
+## 6. Sử dụng
 Mở https://hodinhtan.github.io/private/ → **Đăng nhập bằng Google** → **+ Thêm** để tạo thông tin.
 
 Ghi chú: các giá trị trong `firebase-config.js` không phải bí mật. Việc bảo mật nằm ở bước 3 (Rules) —
