@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email == 'EMAIL_CUA_BAN@gmail.com';
+    }
+
+    function validNote() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['title', 'body', 'updatedAt'])
+        && d.title is string && d.title.size() <= 200
+        && d.body is string && d.body.size() <= 100000
+        && d.updatedAt == request.time;
+    }
+
+    match /notes/{noteId} {
+      allow read, delete: if isOwner();
+      allow create, update: if isOwner() && validNote();
+    }
+  }
+}

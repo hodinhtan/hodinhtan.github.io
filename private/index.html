@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Khu vực riêng</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --text: #1d2127; --muted: #69707d; --border: #e2e5ea;
+    --accent: #2563eb; --accent-text: #fff; --danger: #dc2626; --shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111418; --card: #1a1e24; --text: #e6e8eb; --muted: #9aa1ab; --border: #2b3139;
+      --accent: #4f8cff; --accent-text: #fff; --danger: #f87171; --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+  [hidden] { display: none !important; }
+  h1 { font-size: 1.4rem; margin: 0; }
+  .muted { color: var(--muted); }
+  .center { text-align: center; padding: 64px 0; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; box-shadow: var(--shadow); }
+  button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text); padding: 8px 14px; }
+  button:hover { border-color: var(--muted); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  button.danger { color: var(--danger); }
+  button.small { padding: 4px 10px; font-size: .875rem; }
+  button:disabled { opacity: .6; cursor: default; }
+  input, textarea { font: inherit; color: var(--text); background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; width: 100%; }
+  input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .google-btn { display: inline-flex; align-items: center; gap: 10px; padding: 10px 18px; }
+  .google-btn svg { width: 18px; height: 18px; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .user { display: flex; align-items: center; gap: 8px; font-size: .9rem; min-width: 0; }
+  .user img { width: 28px; height: 28px; border-radius: 50%; }
+  .user span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .toolbar { display: flex; gap: 8px; margin-bottom: 16px; }
+  .toolbar input { flex: 1; }
+  .notes { display: grid; gap: 12px; }
+  .note-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .note h2 { font-size: 1.05rem; margin: 0; word-break: break-word; }
+  .note-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .note-body { white-space: pre-wrap; word-break: break-word; margin: 8px 0 0; }
+  .note-body a { color: var(--accent); }
+  .note-time { font-size: .8rem; color: var(--muted); margin-top: 8px; }
+  .err { color: var(--danger); }
+  dialog { border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--text); padding: 0; width: min(680px, calc(100vw - 32px)); }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  dialog form { display: grid; gap: 12px; padding: 16px; }
+  dialog textarea { min-height: 45vh; resize: vertical; }
+  .dialog-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+  .dialog-actions .spacer { flex: 1; }
+  code { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: .9em; }
+</style>
+</head>
+<body>
+<main>
+  <section id="state-loading" class="center muted">Đang tải…</section>
+
+  <section id="state-config" class="card" hidden>
+    <h1>Chưa cấu hình Firebase</h1>
+    <p>Trang này cần một dự án Firebase để đăng nhập bằng Google và lưu dữ liệu.
+      Làm theo hướng dẫn trong <code>_firebase/README.md</code> của repo, sau đó dán cấu hình vào
+      <code>private/firebase-config.js</code>.</p>
+  </section>
+
+  <section id="state-login" class="center" hidden>
+    <h1>Khu vực riêng</h1>
+    <p class="muted">Đăng nhập để xem thông tin.</p>
+    <button id="login-btn" class="google-btn" type="button">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+      Đăng nhập bằng Google
+    </button>
+    <p id="login-err" class="err" role="alert"></p>
+  </section>
+
+  <section id="state-denied" class="center" hidden>
+    <h1>Không có quyền truy cập</h1>
+    <p class="muted">Tài khoản <strong id="denied-email"></strong> không được phép xem trang này.</p>
+    <button id="denied-logout" type="button">Đăng xuất</button>
+  </section>
+
+  <section id="state-app" hidden>
+    <div class="topbar">
+      <h1>Khu vực riêng</h1>
+      <div class="user">
+        <img id="user-photo" alt="" referrerpolicy="no-referrer" hidden>
+        <span id="user-email"></span>
+        <button id="logout-btn" class="small" type="button">Đăng xuất</button>
+      </div>
+    </div>
+    <div class="toolbar">
+      <input id="search" type="search" placeholder="Tìm kiếm…" aria-label="Tìm kiếm">
+      <button id="new-btn" class="primary" type="button">+ Thêm</button>
+    </div>
+    <p id="app-err" class="err" role="alert"></p>
+    <p id="empty" class="muted center" hidden>Chưa có thông tin nào. Bấm “+ Thêm” để tạo.</p>
+    <div id="notes" class="notes"></div>
+  </section>
+</main>
+
+<dialog id="editor">
+  <form id="editor-form" method="dialog">
+    <input id="ed-title" placeholder="Tiêu đề" required maxlength="200">
+    <textarea id="ed-body" placeholder="Nội dung…" maxlength="100000"></textarea>
+    <p id="ed-err" class="err" role="alert" hidden></p>
+    <div class="dialog-actions">
+      <button id="ed-delete" class="danger" type="button">Xoá</button>
+      <span class="spacer"></span>
+      <button id="ed-cancel" type="button">Huỷ</button>
+      <button id="ed-save" class="primary" type="submit">Lưu</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
