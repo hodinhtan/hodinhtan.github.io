@@ -1,0 +1,20 @@
+[
+  {
+    "id": "portal-1001",
+    "source": "Portal",
+    "title": "Báo cáo doanh thu tháng 9 đã có",
+    "body": "Bản tổng hợp doanh thu các đơn vị thành viên.",
+    "url": "https://example.com/portal/reports/1001",
+    "area": "corp",
+    "ts": "2026-10-03T08:30:00+07:00",
+    "tags": ["báo cáo"]
+  },
+  {
+    "id": "portal-1002",
+    "source": "Portal",
+    "title": "Tổng hợp tin báo chí tuần",
+    "url": "https://example.com/portal/press/1002",
+    "ts": "2026-10-03T09:00:00+07:00",
+    "tags": ["báo chí"]
+  }
+]

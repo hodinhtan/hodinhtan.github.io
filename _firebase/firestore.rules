@@ -7,17 +7,66 @@ service cloud.firestore {
         && request.auth.token.email == 'EMAIL_CUA_BAN@gmail.com';
     }
 
+    function validArea(d) {
+      return d.area in ['personal', 'corp'];
+    }
+
+    function validUrl(u) {
+      return u is string && u.size() <= 2000 && u.matches('^https?://.*');
+    }
+
     function validNote() {
       let d = request.resource.data;
-      return d.keys().hasOnly(['title', 'body', 'updatedAt'])
-        && d.title is string && d.title.size() <= 200
+      return d.keys().hasAll(['title', 'body', 'updatedAt'])
+        && d.keys().hasOnly(['title', 'body', 'area', 'updatedAt'])
+        && d.title is string && d.title.size() > 0 && d.title.size() <= 200
         && d.body is string && d.body.size() <= 100000
+        && (!('area' in d) || validArea(d))
         && d.updatedAt == request.time;
     }
 
-    match /notes/{noteId} {
+    function validTask() {
+      let d = request.resource.data;
+      return d.keys().hasAll(['title', 'area', 'status', 'due', 'link', 'updatedAt'])
+        && d.keys().hasOnly(['title', 'area', 'status', 'due', 'link', 'updatedAt'])
+        && d.title is string && d.title.size() > 0 && d.title.size() <= 200
+        && validArea(d)
+        && d.status in ['todo', 'doing', 'done']
+        && d.due is string && d.due.size() <= 10
+        && d.link is string && (d.link == '' || validUrl(d.link))
+        && d.updatedAt == request.time;
+    }
+
+    function validLink() {
+      let d = request.resource.data;
+      return d.keys().hasAll(['title', 'url', 'area', 'group', 'updatedAt'])
+        && d.keys().hasOnly(['title', 'url', 'area', 'group', 'updatedAt'])
+        && d.title is string && d.title.size() > 0 && d.title.size() <= 200
+        && validUrl(d.url)
+        && validArea(d)
+        && d.group is string && d.group.size() <= 60
+        && d.updatedAt == request.time;
+    }
+
+    match /notes/{id} {
       allow read, delete: if isOwner();
       allow create, update: if isOwner() && validNote();
+    }
+
+    match /tasks/{id} {
+      allow read, delete: if isOwner();
+      allow create, update: if isOwner() && validTask();
+    }
+
+    match /links/{id} {
+      allow read, delete: if isOwner();
+      allow create, update: if isOwner() && validLink();
+    }
+
+    // Dữ liệu từ portal/AD: chỉ script (Admin SDK) được ghi; trình duyệt chỉ đọc/xoá.
+    match /feed/{id} {
+      allow read, delete: if isOwner();
+      allow create, update: if false;
     }
   }
 }

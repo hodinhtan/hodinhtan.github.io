@@ -1,8 +1,11 @@
 import { firebaseConfig } from './firebase-config.js';
+import { $, getPref, setPref } from './ui.js';
+import { views } from './views.js';
+import { disconnectCalendar } from './calendar.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.2';
-const $ = (id) => document.getElementById(id);
 const STATES = ['loading', 'config', 'login', 'denied', 'app'];
+const COLLECTIONS = ['notes', 'tasks', 'links', 'feed'];
 
 function show(name) {
   for (const s of STATES) $(`state-${s}`).hidden = s !== name;
@@ -26,21 +29,110 @@ async function start() {
   const app = initializeApp(firebaseConfig);
   const auth = fa.getAuth(app);
   const db = fs.getFirestore(app);
-  const notesCol = fs.collection(db, 'notes');
 
-  let notes = [];
-  let unsubscribe = null;
-  let editingId = null;
-  let editorSnapshot = '';
+  const store = Object.fromEntries(COLLECTIONS.map((c) => [c, []]));
+  const ctx = {
+    fa, fs, db, auth, store,
+    user: null,
+    area: getPref('dash_area', 'all'),
+    q: '',
+    showDone: false,
+    rerender: render,
+    fail(e) {
+      $('app-err').textContent = 'Lỗi: ' + (e.code || e.message);
+      clearTimeout(ctx.failTimer);
+      ctx.failTimer = setTimeout(() => ($('app-err').textContent = ''), 8000);
+    },
+    save(col, id, data) {
+      const payload = { ...data, updatedAt: fs.serverTimestamp() };
+      return id ? fs.setDoc(fs.doc(db, col, id), payload) : fs.addDoc(fs.collection(db, col), payload);
+    },
+    remove: (col, id) => fs.deleteDoc(fs.doc(db, col, id)),
+  };
+
+  let unsubscribes = [];
+  let status = {};
+
+  function resubscribe(user) {
+    unsubscribes.forEach((u) => u());
+    status = Object.fromEntries(COLLECTIONS.map((c) => [c, 'pending']));
+    for (const c of COLLECTIONS) store[c] = [];
+    unsubscribes = [];
+    if (!user) return;
+    for (const name of COLLECTIONS) {
+      const ref = fs.collection(db, name);
+      const q = name === 'feed' ? fs.query(ref, fs.orderBy('ts', 'desc'), fs.limit(200)) : ref;
+      unsubscribes.push(
+        fs.onSnapshot(
+          q,
+          (snap) => {
+            store[name] = snap.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }) }));
+            status[name] = 'ok';
+            settle();
+          },
+          (err) => {
+            store[name] = [];
+            status[name] = err.code === 'permission-denied' ? 'denied' : 'error:' + (err.code || err.message);
+            settle();
+          },
+        ),
+      );
+    }
+  }
+
+  function settle() {
+    const values = Object.values(status);
+    if (values.includes('pending')) return;
+    if (values.every((s) => s === 'denied')) {
+      $('denied-email').textContent = ctx.user?.email ?? '';
+      show('denied');
+      return;
+    }
+    const denied = COLLECTIONS.filter((c) => status[c] === 'denied');
+    const failed = COLLECTIONS.filter((c) => status[c].startsWith('error:'));
+    const warning = [
+      denied.length && `Firestore Rules chưa cho phép đọc: ${denied.join(', ')}. Hãy dán lại nội dung mới của _firebase/firestore.rules rồi Publish.`,
+      failed.length && `Lỗi tải: ${failed.map((c) => `${c} (${status[c].slice(6)})`).join(', ')}.`,
+    ]
+      .filter(Boolean)
+      .join(' ');
+    $('app-warn').textContent = warning;
+    $('app-warn').hidden = !warning;
+    show('app');
+    render();
+  }
+
+  function render() {
+    const hash = location.hash.replace(/^#\/?/, '');
+    const name = views[hash] ? hash : 'overview';
+    for (const a of document.querySelectorAll('#tabs a')) {
+      if (a.dataset.tab === name) a.setAttribute('aria-current', 'page');
+      else a.removeAttribute('aria-current');
+    }
+    for (const b of document.querySelectorAll('#area-seg button')) {
+      b.setAttribute('aria-pressed', String(b.dataset.area === ctx.area));
+    }
+    const active = document.activeElement;
+    const keep = active?.id && active.closest('#view') ? { id: active.id, value: active.value } : null;
+    $('view').replaceChildren(views[name](ctx));
+    if (keep) {
+      const node = document.getElementById(keep.id);
+      if (node) {
+        node.value = keep.value;
+        node.focus();
+      }
+    }
+  }
 
   fa.onAuthStateChanged(auth, (user) => {
-    if (unsubscribe) unsubscribe();
-    unsubscribe = null;
-    notes = [];
-    render();
+    ctx.user = user;
+    $('app-warn').textContent = '';
+    $('app-warn').hidden = true;
     $('app-err').textContent = '';
-
+    resubscribe(user);
     if (!user) {
+      disconnectCalendar();
+      $('view').replaceChildren();
       show('login');
       return;
     }
@@ -48,25 +140,6 @@ async function start() {
     $('user-photo').hidden = !user.photoURL;
     if (user.photoURL) $('user-photo').src = user.photoURL;
     show('loading');
-
-    const q = fs.query(notesCol, fs.orderBy('updatedAt', 'desc'));
-    unsubscribe = fs.onSnapshot(
-      q,
-      (snap) => {
-        notes = snap.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }) }));
-        show('app');
-        render();
-      },
-      (err) => {
-        if (err.code === 'permission-denied') {
-          $('denied-email').textContent = user.email;
-          show('denied');
-        } else {
-          show('app');
-          $('app-err').textContent = 'Lỗi tải dữ liệu: ' + err.message;
-        }
-      },
-    );
   });
 
   $('login-btn').addEventListener('click', async () => {
@@ -90,135 +163,19 @@ async function start() {
   $('logout-btn').addEventListener('click', logout);
   $('denied-logout').addEventListener('click', logout);
 
-  $('search').addEventListener('input', render);
-  $('new-btn').addEventListener('click', () => openEditor(null));
-
-  function render() {
-    const q = $('search').value.trim().toLowerCase();
-    const list = q
-      ? notes.filter((n) => `${n.title}\n${n.body}`.toLowerCase().includes(q))
-      : notes;
-    $('notes').replaceChildren(...list.map(noteElement));
-    $('empty').hidden = list.length > 0;
-    $('empty').textContent = notes.length
-      ? 'Không tìm thấy kết quả.'
-      : 'Chưa có thông tin nào. Bấm “+ Thêm” để tạo.';
-  }
-
-  function noteElement(n) {
-    const el = document.createElement('article');
-    el.className = 'card note';
-
-    const head = document.createElement('div');
-    head.className = 'note-head';
-    const title = document.createElement('h2');
-    title.textContent = n.title;
-    const actions = document.createElement('div');
-    actions.className = 'note-actions';
-
-    const copyBtn = button('Sao chép', async () => {
-      try {
-        await navigator.clipboard.writeText(n.body);
-        copyBtn.textContent = 'Đã chép';
-      } catch {
-        copyBtn.textContent = 'Lỗi';
-      }
-      setTimeout(() => (copyBtn.textContent = 'Sao chép'), 1500);
-    });
-    actions.append(copyBtn, button('Sửa', () => openEditor(n)));
-    head.append(title, actions);
-
-    const body = document.createElement('p');
-    body.className = 'note-body';
-    body.append(...linkify(n.body));
-
-    const time = document.createElement('div');
-    time.className = 'note-time';
-    const date = n.updatedAt?.toDate?.();
-    time.textContent = date ? 'Cập nhật ' + date.toLocaleString('vi-VN') : '';
-
-    el.append(head, body, time);
-    return el;
-  }
-
-  function button(label, onClick) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'small';
-    b.textContent = label;
-    b.addEventListener('click', onClick);
-    return b;
-  }
-
-  function linkify(text) {
-    return text.split(/(https?:\/\/[^\s<>"']+)/g).map((part, i) => {
-      if (i % 2 === 0) return document.createTextNode(part);
-      const a = document.createElement('a');
-      a.href = part;
-      a.textContent = part;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      return a;
-    });
-  }
-
-  const editor = $('editor');
-
-  function editorState() {
-    return $('ed-title').value + '\u0000' + $('ed-body').value;
-  }
-
-  function openEditor(note) {
-    editingId = note?.id ?? null;
-    $('ed-title').value = note?.title ?? '';
-    $('ed-body').value = note?.body ?? '';
-    $('ed-delete').hidden = !note;
-    $('ed-err').hidden = true;
-    editorSnapshot = editorState();
-    editor.showModal();
-    $(note ? 'ed-body' : 'ed-title').focus();
-  }
-
-  function closeEditor() {
-    if (editorState() !== editorSnapshot && !confirm('Bỏ các thay đổi chưa lưu?')) return;
-    editor.close();
-  }
-
-  $('ed-cancel').addEventListener('click', closeEditor);
-  editor.addEventListener('cancel', (e) => {
-    e.preventDefault();
-    closeEditor();
+  $('search').addEventListener('input', (e) => {
+    ctx.q = e.target.value.trim().toLowerCase();
+    render();
   });
-
-  async function withBusy(action) {
-    const buttons = editor.querySelectorAll('button');
-    buttons.forEach((b) => (b.disabled = true));
-    $('ed-err').hidden = true;
-    try {
-      await action();
-      editor.close();
-    } catch (e) {
-      $('ed-err').textContent = 'Lỗi: ' + (e.code || e.message);
-      $('ed-err').hidden = false;
-    } finally {
-      buttons.forEach((b) => (b.disabled = false));
-    }
-  }
-
-  $('editor-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const data = {
-      title: $('ed-title').value.trim(),
-      body: $('ed-body').value,
-      updatedAt: fs.serverTimestamp(),
-    };
-    withBusy(() =>
-      editingId ? fs.setDoc(fs.doc(notesCol, editingId), data) : fs.addDoc(notesCol, data),
-    );
+  $('area-seg').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-area]');
+    if (!b) return;
+    ctx.area = b.dataset.area;
+    setPref('dash_area', ctx.area);
+    render();
   });
-
-  $('ed-delete').addEventListener('click', () => {
-    if (!confirm(`Xoá “${$('ed-title').value}”?`)) return;
-    withBusy(() => fs.deleteDoc(fs.doc(notesCol, editingId)));
+  window.addEventListener('hashchange', () => {
+    window.scrollTo(0, 0);
+    render();
   });
 }

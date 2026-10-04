@@ -1,0 +1,5 @@
+node_modules/
+# Khoá service account Firebase — không bao giờ đưa lên repo
+*-firebase-adminsdk-*.json
+serviceAccount*.json
+service-account*.json
